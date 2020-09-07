@@ -1,3 +1,5 @@
 import pyautogui
 
-pyautogui.press('f11');
+pyautogui.press('f11')
+
+#영현
