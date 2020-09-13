@@ -7,17 +7,24 @@ import win32gui
 import win32con
 import psutil
 import os
+import cv2
+import sys
+
 
 class MyFrame(wx.MiniFrame):
-    def __init__(self, parent, id,title):
+    def __init__(self, parent, id, title):
+        global capture
+        global videoWriter
+
         #Frame 생성
-        wx.MiniFrame.__init__(self, parent,id,title,size=(300,170),pos=wx.DefaultPosition,
-            style = wx.CAPTION | wx.STAY_ON_TOP )
+        wx.MiniFrame.__init__(self, parent, id, title, size=(300, 170), pos=wx.DefaultPosition,
+                              style=wx.CAPTION | wx.STAY_ON_TOP)
         #panel 생성
-        panel=wx.Panel(self,-1)
+        panel = wx.Panel(self, -1)
 
         #text 추가
-        wx.StaticText(panel, label="웹캠이 녹화중입니다.", pos=(70, 30), style=wx.ALIGN_CENTER)
+        wx.StaticText(panel, label="웹캠이 녹화중입니다.",
+                      pos=(70, 30), style=wx.ALIGN_CENTER)
 
         #버튼 추가
         self.btnEnd = wx.Button(panel, wx.ID_ANY, pos=(95, 70), label='종료')
@@ -31,6 +38,7 @@ class MyFrame(wx.MiniFrame):
         taskBar = win32gui.FindWindow("Shell_TrayWnd", None)
         win32gui.ShowWindow(taskBar, win32con.SW_HIDE)
 
+        """
         f = open(r"C:\Users\s_0hyeon\Desktop\list.txt", 'rt', encoding='utf-8')
         lines = f.readlines()
         for line in lines:
@@ -51,7 +59,8 @@ class MyFrame(wx.MiniFrame):
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):  # 예외처리
                     pass
         f.close()
-
+        """
+        
     def actClipCursor(self, evt):
         # 마우스 범위 제어
         #전역변수로 빼기
@@ -61,7 +70,7 @@ class MyFrame(wx.MiniFrame):
 
     def actEnd(self, evt):
         #키해제
-        keyboard.unblock_key
+        keyboard.unhook_all()
 
         #창전환
         pyautogui.keyDown('Alt')
@@ -74,10 +83,51 @@ class MyFrame(wx.MiniFrame):
         taskBar = win32gui.FindWindow("Shell_TrayWnd", None)
         win32gui.ShowWindow(taskBar, win32con.SW_SHOW)
 
-        self.Destroy()
+        capture.release()
+        videoWriter.release()
+        cv2.destroyAllWindows()
 
+        self.Destroy()
+        sys.exit()
+
+
+class ShowCapture(wx.Panel):
+    def __init__(self, parent, capture, fps=15.0):
+        wx.Panel.__init__(self, parent)
+
+        self.capture = capture
+        ret, frame = self.capture.read()
+
+        height, width = frame.shape[:2]
+        parent.SetSize((width, height))
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        self.bmp = wx.BitmapFromBuffer(width, height, frame)
+
+        self.timer = wx.Timer(self)
+        self.timer.Start(1000./fps)
+
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.Bind(wx.EVT_TIMER, self.NextFrame)
+
+    def OnPaint(self, evt):
+        dc = wx.BufferedPaintDC(self)
+        dc.DrawBitmap(self.bmp, 0, 0)
+
+    def NextFrame(self, evt):
+        ret, frame = self.capture.read()
+
+        if ret:
+            frame = cv2.flip(frame, 1)
+            videoWriter.write(frame)
+            self.bmp.CopyFromBuffer(frame)
+            self.Refresh()
+            
 class MyApp(wx.App):
     def OnInit(self):
+        #웹캠 설정
+        capFrame = wx.Frame(None)
+        cap = ShowCapture(capFrame, capture)
         #전체화면
         ExploreWindow = win32gui.GetForegroundWindow()
         exploreClientRect = win32gui.GetClientRect(ExploreWindow)
@@ -91,13 +141,18 @@ class MyApp(wx.App):
         keyboard.block_key('f11')
 
         wx.InitAllImageHandlers()
-        self.frame = MyFrame(None,-1,'Anti-Fraud Program')
+        self.frame = MyFrame(None, -1, 'Anti-Fraud Program')
         self.frame.Show()
 
         return True
 
+
 if __name__ == '__main__':
-    app=MyApp(0)
+    global capture
+    global videoWriter
+    capture = cv2.VideoCapture(0)
+    codec = cv2.VideoWriter_fourcc('D', 'I', 'V', 'X')
+    videoWriter = cv2.VideoWriter(os.path.expanduser(
+        "~/Desktop/TestWebCam.avi"), codec, 15.0, (640, 480))
+    app = MyApp(0)
     app.MainLoop()
-
-
