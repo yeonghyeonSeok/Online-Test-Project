@@ -37,7 +37,7 @@ class MyFrame(wx.MiniFrame):
         win32gui.ShowWindow(taskBar, win32con.SW_HIDE)
 
         """
-        f = open(r"..\list.txt", 'rt', encoding='utf-8')
+        f = open(r"C:\Users\s_0hyeon\Desktop\list.txt", 'rt', encoding='utf-8')
         lines = f.readlines()
         for line in lines:
             programName = line.rstrip('\n')
@@ -58,7 +58,7 @@ class MyFrame(wx.MiniFrame):
                     pass
         f.close()
         """
-
+        
     def actClipCursor(self, evt):
         # 마우스 범위 제어
         #전역변수로 빼기
@@ -120,8 +120,7 @@ class ShowCapture(wx.Panel):
             videoWriter.write(frame)
             self.bmp.CopyFromBuffer(frame)
             self.Refresh()
-
-
+            
 class MyApp(wx.App):
     def OnInit(self):
         #다중 모니터 감지
@@ -140,7 +139,6 @@ class MyApp(wx.App):
         #웹캠 설정
         capFrame = wx.Frame(None)
         cap = ShowCapture(capFrame, capture)
-
         #전체화면
         ExploreWindow = win32gui.GetForegroundWindow()
         exploreClientRect = win32gui.GetClientRect(ExploreWindow)
