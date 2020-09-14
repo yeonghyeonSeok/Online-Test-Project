@@ -13,11 +13,9 @@ import sys
 
 class MyFrame(wx.MiniFrame):
     def __init__(self, parent, id, title):
-        global capture
-        global videoWriter
-
+        screenWidth, screenHeight = pyautogui.size()
         #Frame 생성
-        wx.MiniFrame.__init__(self, parent, id, title, size=(300, 170), pos=wx.DefaultPosition,
+        wx.MiniFrame.__init__(self, parent, id, title, size=(300, 170), pos=(screenWidth - 300, screenHeight - 170),
                               style=wx.CAPTION | wx.STAY_ON_TOP)
         #panel 생성
         panel = wx.Panel(self, -1)
@@ -125,6 +123,19 @@ class ShowCapture(wx.Panel):
             
 class MyApp(wx.App):
     def OnInit(self):
+        #다중 모니터 감지
+        num_displays = wx.Display.GetCount()
+
+        for display_num in range(1, num_displays):
+            display = wx.Display(display_num)
+            geometry = display.GetGeometry()
+
+            frame = wx.Frame(None, -1, "BLOCK", geometry.GetTopLeft(), geometry.GetSize())
+            
+            frame.Show()
+            
+        print(num_displays)
+
         #웹캠 설정
         capFrame = wx.Frame(None)
         cap = ShowCapture(capFrame, capture)
