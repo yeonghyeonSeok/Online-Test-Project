@@ -128,7 +128,7 @@ class ShowCapture(wx.Panel):
 
 class MyApp(wx.App):
     def OnInit(self):
-        # 다중 모니터 감지
+        # 다중 모니터 감지 및 검은 화면으로 막기
         num_displays = wx.Display.GetCount()
 
         for display_num in range(1, num_displays):
@@ -136,10 +136,8 @@ class MyApp(wx.App):
             geometry = display.GetGeometry()
 
             frame = wx.Frame(None, -1, "BLOCK", geometry.GetTopLeft(), geometry.GetSize())
-
+            frame.SetBackgroundColour('black')
             frame.Show()
-
-        print(num_displays)
 
         # 웹캠 설정
         capFrame = wx.Frame(None)
