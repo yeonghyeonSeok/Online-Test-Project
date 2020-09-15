@@ -154,6 +154,7 @@ class MyApp(wx.App):
         keyboard.block_key('Alt')
         keyboard.block_key('f11')
         keyboard.block_key('win')
+        keyboard.block_key('Ctrl')
 
         wx.InitAllImageHandlers()
 
