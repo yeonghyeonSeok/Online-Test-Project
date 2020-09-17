@@ -321,48 +321,92 @@ class MyApp(wx.App):
                 # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
 
 class SettingFrame(wx.MiniFrame):
-    def __init__(self, parent, id, title):
-        wx.MiniFrame.__init__(self, parent, id, title, size=(400, 300), pos=wx.DefaultPosition,
-                                  style=wx.CAPTION | wx.STAY_ON_TOP)
+    step = 1
+    global btnStart
+    global btnNext
+    global btnFinish
+    global monitor
 
-        self.readyPanel = wx.Panel(self)
+    def __init__(self, parent, id, title):
+        wx.MiniFrame.__init__(self, parent, id, title, size=(400, 300), pos=wx.DefaultPosition, style=wx.CAPTION | wx.STAY_ON_TOP)
+        self.readyPanel=wx.Panel(self)
 
         # text 추가
         wx.StaticText(self.readyPanel, label="초기값 설정중입니다.", pos=(120, 8), style=wx.ALIGN_CENTER)
-        wx.StaticText(self.readyPanel, label="사용자 모니터의 8개 지점을 한번씩 바라봐주세요.", pos=(22, 25), style=wx.ALIGN_CENTER)
+        wx.StaticText(self.readyPanel, label="사용자 모니터에서 점의 위치를 바라봐주세요.", pos=(35, 25), style=wx.ALIGN_CENTER)
         wx.StaticText(self.readyPanel, label="모니터", pos=(165, 115), style=wx.ALIGN_CENTER)
 
-        self.readyPanel.btnFinish = wx.Button(self.readyPanel, label="설정완료", pos=(148, 212), size=(80, 30))
-
+        self.btnStart = wx.Button(self.readyPanel, label = "설정시작", pos=(148, 212), size=(80,30))
+        self.btnNext = wx.Button(self.readyPanel, label ="다음", pos=(164, 212), size=(50, 30))
+        self.btnNext.Hide()
+        self.btnFinish = wx.Button(self.readyPanel, label="설정완료", pos=(148, 212), size=(80, 30))
+        self.btnFinish.Hide()
         self.readyPanel.Bind(wx.EVT_PAINT, self.OnPaint)
+
         # 버튼 이벤트 추가
-        self.Bind(wx.EVT_BUTTON, self.actFinish, self.readyPanel.btnFinish)
+        self.Bind(wx.EVT_BUTTON, self.actNext, self.btnStart)
+
+        # 버튼 이벤트 추가
+        self.Bind(wx.EVT_BUTTON, self.actNext, self.btnNext)
+
+        # 버튼 이벤트 추가
+        self.Bind(wx.EVT_BUTTON, self.actFinish, self.btnFinish)
 
         self.Centre()
         self.Show()
 
+
     def OnPaint(self, evt):
-        rect = wx.PaintDC(self.readyPanel)
-        rect.SetPen(wx.Pen("grey", style=wx.SOLID))
-        rect.SetBrush(wx.Brush("grey", wx.TRANSPARENT))
-        rect.DrawRectangle(14, 50, 354, 151)
-        circle = wx.PaintDC(self.readyPanel)
-        circle.SetPen(wx.Pen("black", style=wx.SOLID))
-        circle.SetBrush(wx.Brush("black", wx.SOLID))
-        circle.DrawCircle(20, 56, 5)
-        circle.DrawCircle(188, 56, 5)
-        circle.DrawCircle(361, 56, 5)
-        circle.DrawCircle(20, 126, 5)
-        circle.DrawCircle(361, 126, 5)
-        circle.DrawCircle(20, 194, 5)
-        circle.DrawCircle(188, 194, 5)
-        circle.DrawCircle(361, 194, 5)
+        self.monitor = wx.ClientDC(self.readyPanel)
+        self.monitor.SetPen(wx.Pen("grey", style=wx.SOLID))
+        self.monitor.SetBrush(wx.Brush("grey", wx.TRANSPARENT))
+        self.monitor.DrawRectangle(14, 50, 354, 151)
 
         self.Show(True)
 
+    def actNext(self, evt):
+        self.monitor.Clear()
+
+        self.monitor = wx.ClientDC(self.readyPanel)
+        self.monitor.SetPen(wx.Pen("grey", style=wx.SOLID))
+        self.monitor.SetBrush(wx.Brush("grey", wx.TRANSPARENT))
+        self.monitor.DrawRectangle(14, 50, 354, 151)
+
+        self.monitor.SetPen(wx.Pen("black", style=wx.SOLID))
+        self.monitor.SetBrush(wx.Brush("black", wx.SOLID))
+
+        if self.step == 1:
+            self.monitor.DrawCircle(20, 56, 5)
+            self.btnStart.Hide()
+            self.btnNext.Show()
+            self.step = 2
+        elif self.step == 2:
+            self.monitor.DrawCircle(188, 56, 5)
+            self.step = 3
+        elif self.step == 3:
+            self.monitor.DrawCircle(361, 56, 5)
+            self.step = 4
+        elif self.step == 4:
+            self.monitor.DrawCircle(20, 126, 5)
+            self.step = 5
+        elif self.step == 5:
+            self.monitor.DrawCircle(361, 126, 5)
+            self.step = 6
+        elif self.step == 6:
+            self.monitor.DrawCircle(20, 194, 5)
+            self.step = 7
+        elif self.step == 7:
+            self.monitor.DrawCircle(188, 194, 5)
+            self.step = 8
+        elif self.step == 8:
+            self.monitor.DrawCircle(361, 194, 5)
+            self.step = 0
+        else:
+            self.btnNext.Hide()
+            self.btnFinish.Show()
+
     def actFinish(self, evt):
         SettingFrame.Hide(self)
-
         cheatFrame = MyFrame(None, -1, 'Anti-Fraud Program')
         cheatFrame.Show()
 
