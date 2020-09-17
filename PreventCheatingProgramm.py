@@ -79,23 +79,6 @@ class MyFrame(wx.MiniFrame):
         # 버튼 이벤트 추가
         self.Bind(wx.EVT_BUTTON, self.actEnd, self.btnEnd)
 
-        # 카카오톡 종료
-        for proc in psutil.process_iter():
-            try:
-                # 프로세스 이름, PID값 가져오기
-                processName = proc.name()
-                processID = proc.pid
-
-                if processName == 'KakaoTalk.exe':
-                    parent_pid = processID  # PID
-                    parent = psutil.Process(parent_pid)  # PID 찾기
-                    for child in parent.children(recursive=True):  # 자식-부모 종료
-                        child.kill()
-                    parent.kill()
-
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):  # 예외처리
-                pass
-
 
     def actEnd(self, evt):
         # 키해제
@@ -317,10 +300,28 @@ class MyApp(wx.App):
         registry = winreg.CreateKeyEx(key, subkey, 0, winreg.KEY_ALL_ACCESS)
         winreg.SetValueEx(registry, "DisableTaskmgr", 0, winreg.REG_DWORD, 1)
 
+        # 카카오톡 종료
+        for proc in psutil.process_iter():
+            try:
+                # 프로세스 이름, PID값 가져오기
+                processName = proc.name()
+                processID = proc.pid
+
+                if processName == 'KakaoTalk.exe':
+                    parent_pid = processID  # PID
+                    parent = psutil.Process(parent_pid)  # PID 찾기
+                    for child in parent.children(recursive=True):  # 자식-부모 종료
+                        child.kill()
+                    parent.kill()
+
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):  # 예외처리
+                pass
+
         return True
 
     def actClipCursor(self, evt):
         # 마우스 범위 제어
+        # 전역변수로 빼기
         width = win32api.GetSystemMetrics(0)
         height = win32api.GetSystemMetrics(1)
         win32api.ClipCursor((0, 20, width, height))
