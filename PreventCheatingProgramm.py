@@ -119,7 +119,7 @@ class MyFrame(wx.MiniFrame):
         registry = winreg.CreateKeyEx(key, subkey, 0, winreg.KEY_ALL_ACCESS)
         winreg.SetValueEx(registry, "DisableTaskmgr", 0, winreg.REG_DWORD, 0)
 
-        f = open("../Online-Test-Project/test_result.txt", 'w+t')
+        f = open(os.path.expanduser("~/Desktop/test_result.txt"), 'w+t')
         f.write(repr(total_cheat / 15))
         f.close()
 
