@@ -14,6 +14,8 @@ import dlib
 from math import hypot
 
 def get_blinking_ratio(eye_points, facial_landmarks):
+    global frame
+
     # 36지점과 39지점을 선으로 연결
     left_point = (facial_landmarks.part(eye_points[0]).x, facial_landmarks.part(eye_points[0]).y)
     right_point = (facial_landmarks.part(eye_points[3]).x, facial_landmarks.part(eye_points[3]).y)
@@ -36,6 +38,7 @@ def get_blinking_ratio(eye_points, facial_landmarks):
     return ratio
 
 def get_side_face_ratio(face_points, facial_landmarks):
+    global frame
     out_face_point = (facial_landmarks.part(face_points[0]).x, facial_landmarks.part(face_points[0]).y)
     inner_face_point = (facial_landmarks.part(face_points[1]).x, facial_landmarks.part(face_points[1]).y)
     hor_line_length = hypot((out_face_point[0] - inner_face_point[0]), (out_face_point[1] - inner_face_point[1]))
@@ -45,6 +48,7 @@ def get_side_face_ratio(face_points, facial_landmarks):
     return hor_line_length
 
 def get_updown_face_ratio(face_points, facial_landmarks):
+    global frame
     u_face_point = (facial_landmarks.part(face_points[0]).x, facial_landmarks.part(face_points[0]).y)
     d_face_point = (facial_landmarks.part(face_points[1]).x, facial_landmarks.part(face_points[1]).y)
     ver_line_length = hypot((u_face_point[0] - d_face_point[0]), (u_face_point[1] - d_face_point[1]))
@@ -115,8 +119,9 @@ class MyFrame(wx.MiniFrame):
         registry = winreg.CreateKeyEx(key, subkey, 0, winreg.KEY_ALL_ACCESS)
         winreg.SetValueEx(registry, "DisableTaskmgr", 0, winreg.REG_DWORD, 0)
 
-        print(total_cheat / 15)
-        print(total_blink / 15)
+        f = open("../Online-Test-Project/test_result.txt", 'w+t')
+        f.write(repr(total_cheat / 15))
+        f.close()
 
         capture.release()
         videoWriter.release()
@@ -150,6 +155,111 @@ class ShowCapture(wx.Panel):
         dc.DrawBitmap(self.bmp, 0, 0)
 
     def NextFrame(self, evt):
+        global standard_side_face_ratio
+        global standard_ud_face_ratio
+        global standard_eye_ratio
+        global total_cheat
+        global total_blink
+        global frame
+
+        if (len(standard_eye_ratio) > 8):
+            _, frame = capture.read()
+            # -----얼굴의 grayscale
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # 얼굴부위를 사각형으로 인식
+            faces = detector(gray)
+            # ---------------------
+            # 얼굴이 웹캠에 없다면 컨닝으로 간주
+            if len(faces) == 0:
+                total_cheat = total_cheat + 1
+                # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
+
+            for face in faces:
+                x, y = face.left(), face.top()
+                x1, y1 = face.right(), face.bottom()
+                # 얼굴 좌표로 사각형출력
+                # cv2.rectangle(frame, (x, y), (x1, y1), (0, 255, 0), 2)
+                # shape dectector로 얼굴의 landmark 포인트들을 예측
+                landmarks = predictor(gray, face)
+
+                # 왼쪽 눈과 오른쪽 눈 각각 눈을 감는 것을 인식
+                left_eye_ratio = get_blinking_ratio([36, 37, 38, 39, 40, 41], landmarks)
+                right_eye_ratio = get_blinking_ratio([42, 43, 44, 45, 46, 47], landmarks)
+                # print(left_eye_ratio)
+
+                left_face_length = get_side_face_ratio([1, 29], landmarks)
+                right_face_length = get_side_face_ratio([15, 29], landmarks)
+
+                up_face_length = get_updown_face_ratio([57, 8], landmarks)
+                down_face_length = get_updown_face_ratio([28, 30], landmarks)
+
+                # 정면을 바라볼 시 1, 좌측은 6, 우측은 0
+                side_face_ratio = (left_face_length / right_face_length)
+                ud_face_ratio = (up_face_length / down_face_length)
+
+                # print(side_face_ratio)
+                # print(ud_face_ratio)
+
+                # 얼굴의 특징점 화면에 출력
+
+                # if 각각 비율의 min, max사이를 벗어나면 컨닝
+
+                # for i in range(0, 68, 1):
+                #    cv2.line(frame, (landmarks.part(i).x, landmarks.part(i).y), (landmarks.part(i).x, landmarks.part(i).y),(255, 0, 0), 5)
+
+                # 두 눈을 모두 감은 경우 깜박임으로 인식
+                if left_eye_ratio > 5.6 and right_eye_ratio > 5.6:
+                    # 눈을 깜박일 때
+                    total_blink = total_blink + 1
+                    # cv2.putText(frame, "blinking", (50,150), font, 3, (255, 0, 0))
+
+                # 눈동자 인식부분
+                left_eye_region = np.array([(landmarks.part(36).x, landmarks.part(36).y),
+                                            (landmarks.part(37).x, landmarks.part(37).y),
+                                            (landmarks.part(38).x, landmarks.part(38).y),
+                                            (landmarks.part(39).x, landmarks.part(39).y),
+                                            (landmarks.part(40).x, landmarks.part(40).y),
+                                            (landmarks.part(41).x, landmarks.part(41).y)], np.int32)
+                # 흰자와 검은자만 있는 눈 부위
+                cv2.polylines(frame, [left_eye_region], True, (0, 0, 255), 1)
+                height, width, _ = frame.shape
+                mask = np.zeros((height, width), np.uint8)
+                cv2.polylines(mask, [left_eye_region], True, 255, 1)
+                cv2.fillPoly(mask, [left_eye_region], 255)
+                left_eye = cv2.bitwise_and(gray, gray, mask=mask)
+
+                min_x = np.min(left_eye_region[:, 0])
+                max_x = np.max(left_eye_region[:, 0])
+                min_y = np.min(left_eye_region[:, 1])
+                max_y = np.max(left_eye_region[:, 1])
+                # 흰자와 검은자만 있는 눈 부위 사각형으로
+                # eye = frame[min_y : max_y, min_x : max_x]
+                gray_eye = left_eye[min_y: max_y, min_x: max_x]
+                # 그레이 스케일 및 이진화
+                # gray_eye = cv2.cvtColor(eye, cv2.COLOR_BGR2GRAY)
+                _, threshold_eye = cv2.threshold(gray_eye, 70, 255, cv2.THRESH_BINARY)
+
+                # 리사이즈 및 출력
+                # eye = cv2.resize(eye, None, fx=5, fy=5)
+                eye = cv2.resize(gray_eye, None, fx=5, fy=5)
+                threshold_eye = cv2.resize(threshold_eye, None, fx=5, fy=5)
+                # cv2.imshow("Eye", eye)
+                # cv2.imshow("Threshold", threshold_eye)
+                # cv2.imshow("left_eye", left_eye)
+                # 흰 픽셀의 수
+                white = cv2.countNonZero(threshold_eye)
+                # print(white)
+                if (left_eye_ratio <= 5.6 and right_eye_ratio <= 5.6) and (
+                        standard_ud_face_ratio.max() < ud_face_ratio or standard_ud_face_ratio.min() > ud_face_ratio):
+                    total_cheat = total_cheat + 1
+                    # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
+                if standard_side_face_ratio.max() < side_face_ratio or standard_side_face_ratio.min() > side_face_ratio:
+                    total_cheat = total_cheat + 1
+                    # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
+                if standard_eye_ratio.max() < white:
+                    total_cheat = total_cheat + 1
+                    # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
+
         ret, frame = self.capture.read()
 
         if ret:
@@ -161,6 +271,9 @@ class ShowCapture(wx.Panel):
 
 class MyApp(wx.App):
     def OnInit(self):
+        settingFrame = SettingFrame(None, -1, 'Setting')
+        settingFrame.Show()
+
         # 다중 모니터 감지 및 검은 화면으로 막기
         num_displays = wx.Display.GetCount()
 
@@ -204,9 +317,6 @@ class MyApp(wx.App):
         registry = winreg.CreateKeyEx(key, subkey, 0, winreg.KEY_ALL_ACCESS)
         winreg.SetValueEx(registry, "DisableTaskmgr", 0, winreg.REG_DWORD, 1)
 
-        settingFrame = SettingFrame(None, -1, 'Setting')
-        settingFrame.Show()
-
         return True
 
     def actClipCursor(self, evt):
@@ -215,110 +325,6 @@ class MyApp(wx.App):
         width = win32api.GetSystemMetrics(0)
         height = win32api.GetSystemMetrics(1)
         win32api.ClipCursor((0, 20, width, height))
-
-        global standard_side_face_ratio
-        global standard_ud_face_ratio
-        global standard_eye_ratio
-        global total_cheat
-        global total_blink
-
-        _, frame = capture.read()
-        # -----얼굴의 grayscale
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # 얼굴부위를 사각형으로 인식
-        faces = detector(gray)
-        # ---------------------
-        # 얼굴이 웹캠에 없다면 컨닝으로 간주
-        if len(faces) == 0:
-            total_cheat = total_cheat + 1
-            # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
-
-        for face in faces:
-            x, y = face.left(), face.top()
-            x1, y1 = face.right(), face.bottom()
-            # 얼굴 좌표로 사각형출력
-            # cv2.rectangle(frame, (x, y), (x1, y1), (0, 255, 0), 2)
-            # shape dectector로 얼굴의 landmark 포인트들을 예측
-            landmarks = predictor(gray, face)
-
-            # 왼쪽 눈과 오른쪽 눈 각각 눈을 감는 것을 인식
-            left_eye_ratio = get_blinking_ratio([36, 37, 38, 39, 40, 41], landmarks)
-            right_eye_ratio = get_blinking_ratio([42, 43, 44, 45, 46, 47], landmarks)
-            # print(left_eye_ratio)
-
-            left_face_length = get_side_face_ratio([1, 29], landmarks)
-            right_face_length = get_side_face_ratio([15, 29], landmarks)
-
-            up_face_length = get_updown_face_ratio([57, 8], landmarks)
-            down_face_length = get_updown_face_ratio([28, 30], landmarks)
-
-            # 정면을 바라볼 시 1, 좌측은 6, 우측은 0
-            side_face_ratio = (left_face_length / right_face_length)
-            ud_face_ratio = (up_face_length / down_face_length)
-
-            # print(side_face_ratio)
-            # print(ud_face_ratio)
-
-            # 얼굴의 특징점 화면에 출력
-
-            # if 각각 비율의 min, max사이를 벗어나면 컨닝
-
-            #for i in range(0, 68, 1):
-            #    cv2.line(frame, (landmarks.part(i).x, landmarks.part(i).y), (landmarks.part(i).x, landmarks.part(i).y),(255, 0, 0), 5)
-
-
-            # 두 눈을 모두 감은 경우 깜박임으로 인식
-            if left_eye_ratio > 5.6 and right_eye_ratio > 5.6:
-                # 눈을 깜박일 때
-                total_blink = total_blink + 1
-                # cv2.putText(frame, "blinking", (50,150), font, 3, (255, 0, 0))
-
-            # 눈동자 인식부분
-            left_eye_region = np.array([(landmarks.part(36).x, landmarks.part(36).y),
-                                        (landmarks.part(37).x, landmarks.part(37).y),
-                                        (landmarks.part(38).x, landmarks.part(38).y),
-                                        (landmarks.part(39).x, landmarks.part(39).y),
-                                        (landmarks.part(40).x, landmarks.part(40).y),
-                                        (landmarks.part(41).x, landmarks.part(41).y)], np.int32)
-            # 흰자와 검은자만 있는 눈 부위
-            cv2.polylines(frame, [left_eye_region], True, (0, 0, 255), 1)
-            height, width, _ = frame.shape
-            mask = np.zeros((height, width), np.uint8)
-            cv2.polylines(mask, [left_eye_region], True, 255, 1)
-            cv2.fillPoly(mask, [left_eye_region], 255)
-            left_eye = cv2.bitwise_and(gray, gray, mask=mask)
-
-            min_x = np.min(left_eye_region[:, 0])
-            max_x = np.max(left_eye_region[:, 0])
-            min_y = np.min(left_eye_region[:, 1])
-            max_y = np.max(left_eye_region[:, 1])
-            # 흰자와 검은자만 있는 눈 부위 사각형으로
-            # eye = frame[min_y : max_y, min_x : max_x]
-            gray_eye = left_eye[min_y: max_y, min_x: max_x]
-            # 그레이 스케일 및 이진화
-            # gray_eye = cv2.cvtColor(eye, cv2.COLOR_BGR2GRAY)
-            _, threshold_eye = cv2.threshold(gray_eye, 70, 255, cv2.THRESH_BINARY)
-
-            # 리사이즈 및 출력
-            # eye = cv2.resize(eye, None, fx=5, fy=5)
-            eye = cv2.resize(gray_eye, None, fx=5, fy=5)
-            threshold_eye = cv2.resize(threshold_eye, None, fx=5, fy=5)
-            # cv2.imshow("Eye", eye)
-            # cv2.imshow("Threshold", threshold_eye)
-            # cv2.imshow("left_eye", left_eye)
-            # 흰 픽셀의 수
-            white = cv2.countNonZero(threshold_eye)
-            # print(white)
-            if (left_eye_ratio <= 5.6 and right_eye_ratio <= 5.6) and (
-                    standard_ud_face_ratio.max() < ud_face_ratio or standard_ud_face_ratio.min() > ud_face_ratio):
-                total_cheat = total_cheat + 1
-                # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
-            if standard_side_face_ratio.max() < side_face_ratio or standard_side_face_ratio.min() > side_face_ratio:
-                total_cheat = total_cheat + 1
-                # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
-            if standard_eye_ratio.max() < white:
-                total_cheat = total_cheat + 1
-                # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
 
 class SettingFrame(wx.MiniFrame):
     step = 1
@@ -365,6 +371,70 @@ class SettingFrame(wx.MiniFrame):
         self.Show(True)
 
     def actNext(self, evt):
+        global capture
+        global standard_side_face_ratio
+        global standard_ud_face_ratio
+        global standard_eye_ratio
+        global frame
+        global iter_for_standard
+
+        _, frame = capture.read()
+        # -----얼굴의 grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # 얼굴부위를 사각형으로 인식
+        faces = detector(gray)
+
+        if len(faces) == 0:
+            print("얼굴을 웹캠에 위치시켜 주세요")
+        for face in faces:
+            landmarks = predictor(gray, face)
+            left_eye_ratio = get_blinking_ratio([36, 37, 38, 39, 40, 41], landmarks)
+            right_eye_ratio = get_blinking_ratio([42, 43, 44, 45, 46, 47], landmarks)
+
+            left_face_length = get_side_face_ratio([1, 29], landmarks)
+            right_face_length = get_side_face_ratio([15, 29], landmarks)
+
+            up_face_length = get_updown_face_ratio([57, 8], landmarks)
+            down_face_length = get_updown_face_ratio([28, 30], landmarks)
+
+            side_face_ratio = (left_face_length / right_face_length)
+            standard_side_face_ratio.append(side_face_ratio)
+            ud_face_ratio = (up_face_length / down_face_length)
+            standard_ud_face_ratio.append(ud_face_ratio)
+
+            # 눈동자 인식부분
+            left_eye_region = np.array([(landmarks.part(36).x, landmarks.part(36).y),
+                                        (landmarks.part(37).x, landmarks.part(37).y),
+                                        (landmarks.part(38).x, landmarks.part(38).y),
+                                        (landmarks.part(39).x, landmarks.part(39).y),
+                                        (landmarks.part(40).x, landmarks.part(40).y),
+                                        (landmarks.part(41).x, landmarks.part(41).y)], np.int32)
+            # 흰자와 검은자만 있는 눈 부위
+            cv2.polylines(frame, [left_eye_region], True, (0, 0, 255), 1)
+            height, width, _ = frame.shape
+            mask = np.zeros((height, width), np.uint8)
+            cv2.polylines(mask, [left_eye_region], True, 255, 1)
+            cv2.fillPoly(mask, [left_eye_region], 255)
+            left_eye = cv2.bitwise_and(gray, gray, mask=mask)
+
+            min_x = np.min(left_eye_region[:, 0])
+            max_x = np.max(left_eye_region[:, 0])
+            min_y = np.min(left_eye_region[:, 1])
+            max_y = np.max(left_eye_region[:, 1])
+            gray_eye = left_eye[min_y: max_y, min_x: max_x]
+            _, threshold_eye = cv2.threshold(gray_eye, 70, 255, cv2.THRESH_BINARY)
+
+            eye = cv2.resize(gray_eye, None, fx=5, fy=5)
+            threshold_eye = cv2.resize(threshold_eye, None, fx=5, fy=5)
+            white = cv2.countNonZero(threshold_eye)
+            standard_eye_ratio.append(white)
+            iter_for_standard = iter_for_standard + 1
+
+        if(iter_for_standard == 9):
+            standard_eye_ratio = np.array(standard_eye_ratio)
+            standard_side_face_ratio = np.array(standard_side_face_ratio)
+            standard_ud_face_ratio = np.array(standard_ud_face_ratio)
+
         self.monitor.Clear()
 
         self.monitor = wx.ClientDC(self.readyPanel)
@@ -418,6 +488,10 @@ if __name__ == '__main__':
     global standard_eye_ratio
     global total_cheat
     global total_blink
+    global frame
+    global iter_for_standard
+
+    iter_for_standard = 0
     # 전면부 얼굴 인식
     detector = dlib.get_frontal_face_detector()
     # 얼굴의 각 특징을 예측하는 모델
@@ -439,68 +513,6 @@ if __name__ == '__main__':
 
     total_cheat = 0
     total_blink = 0
-
-    print("초기값 셋팅입니다.")
-    i = 0
-    while i < 8:
-        print("모니터의 8방향을 보고 스페이스바를 누른 후 엔터를 입력해 주세요")
-        if input() == ' ':
-            _, frame = capture.read()
-            # -----얼굴의 grayscale
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            # 얼굴부위를 사각형으로 인식
-            faces = detector(gray)
-
-            if len(faces) == 0:
-                print("얼굴을 웹캠에 위치시켜 주세요")
-                continue
-            for face in faces:
-                landmarks = predictor(gray, face)
-                left_eye_ratio = get_blinking_ratio([36, 37, 38, 39, 40, 41], landmarks)
-                right_eye_ratio = get_blinking_ratio([42, 43, 44, 45, 46, 47], landmarks)
-
-                left_face_length = get_side_face_ratio([1, 29], landmarks)
-                right_face_length = get_side_face_ratio([15, 29], landmarks)
-
-                up_face_length = get_updown_face_ratio([57, 8], landmarks)
-                down_face_length = get_updown_face_ratio([28, 30], landmarks)
-
-                side_face_ratio = (left_face_length / right_face_length)
-                standard_side_face_ratio.append(side_face_ratio)
-                ud_face_ratio = (up_face_length / down_face_length)
-                standard_ud_face_ratio.append(ud_face_ratio)
-
-                # 눈동자 인식부분
-                left_eye_region = np.array([(landmarks.part(36).x, landmarks.part(36).y),
-                                            (landmarks.part(37).x, landmarks.part(37).y),
-                                            (landmarks.part(38).x, landmarks.part(38).y),
-                                            (landmarks.part(39).x, landmarks.part(39).y),
-                                            (landmarks.part(40).x, landmarks.part(40).y),
-                                            (landmarks.part(41).x, landmarks.part(41).y)], np.int32)
-                # 흰자와 검은자만 있는 눈 부위
-                cv2.polylines(frame, [left_eye_region], True, (0, 0, 255), 1)
-                height, width, _ = frame.shape
-                mask = np.zeros((height, width), np.uint8)
-                cv2.polylines(mask, [left_eye_region], True, 255, 1)
-                cv2.fillPoly(mask, [left_eye_region], 255)
-                left_eye = cv2.bitwise_and(gray, gray, mask=mask)
-
-                min_x = np.min(left_eye_region[:, 0])
-                max_x = np.max(left_eye_region[:, 0])
-                min_y = np.min(left_eye_region[:, 1])
-                max_y = np.max(left_eye_region[:, 1])
-                gray_eye = left_eye[min_y: max_y, min_x: max_x]
-                _, threshold_eye = cv2.threshold(gray_eye, 70, 255, cv2.THRESH_BINARY)
-
-                eye = cv2.resize(gray_eye, None, fx=5, fy=5)
-                threshold_eye = cv2.resize(threshold_eye, None, fx=5, fy=5)
-                white = cv2.countNonZero(threshold_eye)
-                standard_eye_ratio.append(white)
-            i = i + 1
-
-    standard_eye_ratio = np.array(standard_eye_ratio)
-    standard_side_face_ratio = np.array(standard_side_face_ratio)
-    standard_ud_face_ratio = np.array(standard_ud_face_ratio)
 
     app = MyApp(0)
     app.MainLoop()
