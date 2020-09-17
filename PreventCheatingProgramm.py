@@ -211,7 +211,6 @@ class MyApp(wx.App):
 
     def actClipCursor(self, evt):
         # 마우스 범위 제어
-        # 전역변수로 빼기
         width = win32api.GetSystemMetrics(0)
         height = win32api.GetSystemMetrics(1)
         win32api.ClipCursor((0, 20, width, height))
