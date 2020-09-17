@@ -4,6 +4,7 @@ import keyboard
 import win32api
 import win32gui
 import win32con
+import psutil
 import os
 import cv2
 import sys
@@ -74,6 +75,122 @@ class MyFrame(wx.MiniFrame):
         # 버튼 이벤트 추가
         self.Bind(wx.EVT_BUTTON, self.actEnd, self.btnEnd)
 
+        # 카카오톡 종료
+        for proc in psutil.process_iter():
+            try:
+                # 프로세스 이름, PID값 가져오기
+                processName = proc.name()
+                processID = proc.pid
+
+                if processName == 'KakaoTalk.exe':
+                    parent_pid = processID  # PID
+                    parent = psutil.Process(parent_pid)  # PID 찾기
+                    for child in parent.children(recursive=True):  # 자식-부모 종료
+                        child.kill()
+                    parent.kill()
+
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):  # 예외처리
+                pass
+
+
+    def actEnd(self, evt):
+        # 키해제
+        keyboard.unhook_all()
+
+        # 창전환
+        pyautogui.keyDown('Alt')
+        pyautogui.press('Tab')
+        pyautogui.keyUp('Alt')
+
+        # 전체화면 해제
+        pyautogui.press('f11')
+
+        # 작업표시줄 표시
+        taskBar = win32gui.FindWindow("Shell_TrayWnd", None)
+        win32gui.ShowWindow(taskBar, win32con.SW_SHOW)
+
+        # 작업관리자 비활성화 해제
+        key = winreg.HKEY_CURRENT_USER
+        subkey = r"Software\Microsoft\Windows\CurrentVersion\Policies\System"
+        registry = winreg.CreateKeyEx(key, subkey, 0, winreg.KEY_ALL_ACCESS)
+        winreg.SetValueEx(registry, "DisableTaskmgr", 0, winreg.REG_DWORD, 0)
+
+        print(total_cheat / 15)
+        print(total_blink / 15)
+
+        capture.release()
+        videoWriter.release()
+        cv2.destroyAllWindows()
+
+        self.Destroy()
+        sys.exit()
+
+
+class ShowCapture(wx.Panel):
+    def __init__(self, parent, capture, fps=15.0):
+        wx.Panel.__init__(self, parent)
+
+        self.capture = capture
+        ret, frame = self.capture.read()
+
+        height, width = frame.shape[:2]
+        parent.SetSize((width, height))
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        self.bmp = wx.BitmapFromBuffer(width, height, frame)
+
+        self.timer = wx.Timer(self)
+        self.timer.Start(1000. / fps)
+
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.Bind(wx.EVT_TIMER, self.NextFrame)
+
+    def OnPaint(self, evt):
+        dc = wx.BufferedPaintDC(self)
+        dc.DrawBitmap(self.bmp, 0, 0)
+
+    def NextFrame(self, evt):
+        ret, frame = self.capture.read()
+
+        if ret:
+            frame = cv2.flip(frame, 1)
+            videoWriter.write(frame)
+            self.bmp.CopyFromBuffer(frame)
+            self.Refresh()
+
+
+class MyApp(wx.App):
+    def OnInit(self):
+        # 다중 모니터 감지 및 검은 화면으로 막기
+        num_displays = wx.Display.GetCount()
+
+        for display_num in range(1, num_displays):
+            display = wx.Display(display_num)
+            geometry = display.GetGeometry()
+
+            frame = wx.Frame(None, -1, "BLOCK", geometry.GetTopLeft(), geometry.GetSize())
+            frame.SetBackgroundColour('black')
+            frame.Show()
+
+        # 웹캠 설정
+        capFrame = wx.Frame(None)
+        cap = ShowCapture(capFrame, capture)
+        # 전체화면
+        ExploreWindow = win32gui.GetForegroundWindow()
+        exploreClientRect = win32gui.GetClientRect(ExploreWindow)
+        height = win32api.GetSystemMetrics(1)
+        if exploreClientRect[3] < height:
+            pyautogui.press('f11')
+
+        # 키제한 - 작업관리자 창 따로 해줘야함
+        keyboard.block_key('Tab')
+        keyboard.block_key('Alt')
+        keyboard.block_key('f11')
+        keyboard.block_key('win')
+        keyboard.block_key('Ctrl')
+
+        wx.InitAllImageHandlers()
+
         # 마우스 범위 지정
         self.Bind(wx.EVT_UPDATE_UI, self.actClipCursor)
 
@@ -81,26 +198,16 @@ class MyFrame(wx.MiniFrame):
         taskBar = win32gui.FindWindow("Shell_TrayWnd", None)
         win32gui.ShowWindow(taskBar, win32con.SW_HIDE)
 
-        # f = open(r"C:\Users\s_0hyeon\Desktop\list.txt", 'rt', encoding='utf-8')
-        # lines = f.readlines()
-        # for line in lines:
-        #     programName = line.rstrip('\n')
-        #     for proc in psutil.process_iter():
-        #         try:
-        #             # 프로세스 이름, PID값 가져오기
-        #             processName = proc.name()
-        #             processID = proc.pid
-        #
-        #             if processName == programName:
-        #                 parent_pid = processID  # PID
-        #                 parent = psutil.Process(parent_pid)  # PID 찾기
-        #                 for child in parent.children(recursive=True):  # 자식-부모 종료
-        #                     child.kill()
-        #                 parent.kill()
-        #
-        #         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):  # 예외처리
-        #             pass
-        # f.close()
+        # 작업관리자 비활성화
+        key = winreg.HKEY_CURRENT_USER
+        subkey = r"Software\Microsoft\Windows\CurrentVersion\Policies\System"
+        registry = winreg.CreateKeyEx(key, subkey, 0, winreg.KEY_ALL_ACCESS)
+        winreg.SetValueEx(registry, "DisableTaskmgr", 0, winreg.REG_DWORD, 1)
+
+        settingFrame = SettingFrame(None, -1, 'Setting')
+        settingFrame.Show()
+
+        return True
 
     def actClipCursor(self, evt):
         # 마우스 범위 제어
@@ -213,115 +320,51 @@ class MyFrame(wx.MiniFrame):
                 total_cheat = total_cheat + 1
                 # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
 
-    def actEnd(self, evt):
-        # 키해제
-        keyboard.unhook_all()
+class SettingFrame(wx.MiniFrame):
+    def __init__(self, parent, id, title):
+        wx.MiniFrame.__init__(self, parent, id, title, size=(400, 300), pos=wx.DefaultPosition,
+                                  style=wx.CAPTION | wx.STAY_ON_TOP)
 
-        # 창전환
-        pyautogui.keyDown('Alt')
-        pyautogui.press('Tab')
-        pyautogui.keyUp('Alt')
+        self.readyPanel = wx.Panel(self)
 
-        # 전체화면 해제
-        pyautogui.press('f11')
+        # text 추가
+        wx.StaticText(self.readyPanel, label="초기값 설정중입니다.", pos=(120, 8), style=wx.ALIGN_CENTER)
+        wx.StaticText(self.readyPanel, label="사용자 모니터의 8개 지점을 한번씩 바라봐주세요.", pos=(22, 25), style=wx.ALIGN_CENTER)
+        wx.StaticText(self.readyPanel, label="모니터", pos=(165, 115), style=wx.ALIGN_CENTER)
 
-        # 작업표시줄 표시
-        taskBar = win32gui.FindWindow("Shell_TrayWnd", None)
-        win32gui.ShowWindow(taskBar, win32con.SW_SHOW)
+        self.readyPanel.btnFinish = wx.Button(self.readyPanel, label="설정완료", pos=(148, 212), size=(80, 30))
 
-        # 작업관리자 비활성화 해제
-        key = winreg.HKEY_CURRENT_USER
-        subkey = r"Software\Microsoft\Windows\CurrentVersion\Policies\System"
-        registry = winreg.CreateKeyEx(key, subkey, 0, winreg.KEY_ALL_ACCESS)
-        winreg.SetValueEx(registry, "DisableTaskmgr", 0, winreg.REG_DWORD, 0)
+        self.readyPanel.Bind(wx.EVT_PAINT, self.OnPaint)
+        # 버튼 이벤트 추가
+        self.Bind(wx.EVT_BUTTON, self.actFinish, self.readyPanel.btnFinish)
 
-        print(total_cheat / 15)
-        print(total_blink / 15)
-
-        capture.release()
-        videoWriter.release()
-        cv2.destroyAllWindows()
-
-        self.Destroy()
-        sys.exit()
-
-
-class ShowCapture(wx.Panel):
-    def __init__(self, parent, capture, fps=15.0):
-        wx.Panel.__init__(self, parent)
-
-        self.capture = capture
-        ret, frame = self.capture.read()
-
-        height, width = frame.shape[:2]
-        parent.SetSize((width, height))
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        self.bmp = wx.BitmapFromBuffer(width, height, frame)
-
-        self.timer = wx.Timer(self)
-        self.timer.Start(1000. / fps)
-
-        self.Bind(wx.EVT_PAINT, self.OnPaint)
-        self.Bind(wx.EVT_TIMER, self.NextFrame)
+        self.Centre()
+        self.Show()
 
     def OnPaint(self, evt):
-        dc = wx.BufferedPaintDC(self)
-        dc.DrawBitmap(self.bmp, 0, 0)
+        rect = wx.PaintDC(self.readyPanel)
+        rect.SetPen(wx.Pen("grey", style=wx.SOLID))
+        rect.SetBrush(wx.Brush("grey", wx.TRANSPARENT))
+        rect.DrawRectangle(14, 50, 354, 151)
+        circle = wx.PaintDC(self.readyPanel)
+        circle.SetPen(wx.Pen("black", style=wx.SOLID))
+        circle.SetBrush(wx.Brush("black", wx.SOLID))
+        circle.DrawCircle(20, 56, 5)
+        circle.DrawCircle(188, 56, 5)
+        circle.DrawCircle(361, 56, 5)
+        circle.DrawCircle(20, 126, 5)
+        circle.DrawCircle(361, 126, 5)
+        circle.DrawCircle(20, 194, 5)
+        circle.DrawCircle(188, 194, 5)
+        circle.DrawCircle(361, 194, 5)
 
-    def NextFrame(self, evt):
-        ret, frame = self.capture.read()
+        self.Show(True)
 
-        if ret:
-            frame = cv2.flip(frame, 1)
-            videoWriter.write(frame)
-            self.bmp.CopyFromBuffer(frame)
-            self.Refresh()
+    def actFinish(self, evt):
+        SettingFrame.Hide(self)
 
-
-class MyApp(wx.App):
-    def OnInit(self):
-        # 다중 모니터 감지 및 검은 화면으로 막기
-        num_displays = wx.Display.GetCount()
-
-        for display_num in range(1, num_displays):
-            display = wx.Display(display_num)
-            geometry = display.GetGeometry()
-
-            frame = wx.Frame(None, -1, "BLOCK", geometry.GetTopLeft(), geometry.GetSize())
-            frame.SetBackgroundColour('black')
-            frame.Show()
-
-        # 웹캠 설정
-        capFrame = wx.Frame(None)
-        cap = ShowCapture(capFrame, capture)
-        # 전체화면
-        ExploreWindow = win32gui.GetForegroundWindow()
-        exploreClientRect = win32gui.GetClientRect(ExploreWindow)
-        height = win32api.GetSystemMetrics(1)
-        if exploreClientRect[3] < height:
-            pyautogui.press('f11')
-
-        # 키제한 - 작업관리자 창 따로 해줘야함
-        keyboard.block_key('Tab')
-        keyboard.block_key('Alt')
-        keyboard.block_key('f11')
-        keyboard.block_key('win')
-        keyboard.block_key('Ctrl')
-
-        wx.InitAllImageHandlers()
-
-        # 작업관리자 비활성화
-        key = winreg.HKEY_CURRENT_USER
-        subkey = r"Software\Microsoft\Windows\CurrentVersion\Policies\System"
-        registry = winreg.CreateKeyEx(key, subkey, 0, winreg.KEY_ALL_ACCESS)
-        winreg.SetValueEx(registry, "DisableTaskmgr", 0, winreg.REG_DWORD, 1)
-
-        self.frame = MyFrame(None, -1, 'Anti-Fraud Program')
-        self.frame.Show()
-
-        return True
-
+        cheatFrame = MyFrame(None, -1, 'Anti-Fraud Program')
+        cheatFrame.Show()
 
 if __name__ == '__main__':
     global capture
