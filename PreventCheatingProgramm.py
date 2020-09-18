@@ -266,6 +266,7 @@ class MyApp(wx.App):
 
             frame = wx.Frame(None, -1, "BLOCK", geometry.GetTopLeft(), geometry.GetSize())
             frame.SetBackgroundColour('black')
+            frame.SetWindowStyle(wx.STAY_ON_TOP)
             frame.Show()
 
         # 웹캠 설정
