@@ -4,7 +4,6 @@ import keyboard
 import win32api
 import win32gui
 import win32con
-import psutil
 import os
 import cv2
 import sys
@@ -14,11 +13,7 @@ import dlib
 import time
 from math import hypot
 import webbrowser as wb
-
-from pywinauto.win32functions import GetCurrentThreadId
-from pywinauto.win32structures import HWND
-from win32process import GetWindowThreadProcessId, AttachThreadInput
-
+import module.killProcess as kp
 
 def get_blinking_ratio(eye_points, facial_landmarks):
     global frame
@@ -161,20 +156,16 @@ class ShowCapture(wx.Panel):
             # 얼굴이 웹캠에 없다면 컨닝으로 간주
             if len(faces) == 0:
                 total_cheat = total_cheat + 1
-                # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
 
             for face in faces:
                 x, y = face.left(), face.top()
                 x1, y1 = face.right(), face.bottom()
                 # 얼굴 좌표로 사각형출력
-                # cv2.rectangle(frame, (x, y), (x1, y1), (0, 255, 0), 2)
-                # shape dectector로 얼굴의 landmark 포인트들을 예측
                 landmarks = predictor(gray, face)
 
                 # 왼쪽 눈과 오른쪽 눈 각각 눈을 감는 것을 인식
                 left_eye_ratio = get_blinking_ratio([36, 37, 38, 39, 40, 41], landmarks)
                 right_eye_ratio = get_blinking_ratio([42, 43, 44, 45, 46, 47], landmarks)
-                # print(left_eye_ratio)
 
                 left_face_length = get_side_face_ratio([1, 29], landmarks)
                 right_face_length = get_side_face_ratio([15, 29], landmarks)
@@ -186,21 +177,10 @@ class ShowCapture(wx.Panel):
                 side_face_ratio = (left_face_length / right_face_length)
                 ud_face_ratio = (up_face_length / down_face_length)
 
-                # print(side_face_ratio)
-                # print(ud_face_ratio)
-
-                # 얼굴의 특징점 화면에 출력
-
-                # if 각각 비율의 min, max사이를 벗어나면 컨닝
-
-                # for i in range(0, 68, 1):
-                #    cv2.line(frame, (landmarks.part(i).x, landmarks.part(i).y), (landmarks.part(i).x, landmarks.part(i).y),(255, 0, 0), 5)
-
                 # 두 눈을 모두 감은 경우 깜박임으로 인식
                 if left_eye_ratio > 5.6 and right_eye_ratio > 5.6:
                     # 눈을 깜박일 때
                     total_blink = total_blink + 1
-                    # cv2.putText(frame, "blinking", (50,150), font, 3, (255, 0, 0))
 
                 # 눈동자 인식부분
                 left_eye_region = np.array([(landmarks.part(36).x, landmarks.part(36).y),
@@ -222,32 +202,23 @@ class ShowCapture(wx.Panel):
                 min_y = np.min(left_eye_region[:, 1])
                 max_y = np.max(left_eye_region[:, 1])
                 # 흰자와 검은자만 있는 눈 부위 사각형으로
-                # eye = frame[min_y : max_y, min_x : max_x]
                 gray_eye = left_eye[min_y: max_y, min_x: max_x]
                 # 그레이 스케일 및 이진화
-                # gray_eye = cv2.cvtColor(eye, cv2.COLOR_BGR2GRAY)
                 _, threshold_eye = cv2.threshold(gray_eye, 70, 255, cv2.THRESH_BINARY)
 
                 # 리사이즈 및 출력
-                # eye = cv2.resize(eye, None, fx=5, fy=5)
                 eye = cv2.resize(gray_eye, None, fx=5, fy=5)
                 threshold_eye = cv2.resize(threshold_eye, None, fx=5, fy=5)
-                # cv2.imshow("Eye", eye)
-                # cv2.imshow("Threshold", threshold_eye)
-                # cv2.imshow("left_eye", left_eye)
                 # 흰 픽셀의 수
                 white = cv2.countNonZero(threshold_eye)
                 # print(white)
                 if (left_eye_ratio <= 5.6 and right_eye_ratio <= 5.6) and (
                         standard_ud_face_ratio.max() < ud_face_ratio or standard_ud_face_ratio.min() > ud_face_ratio):
                     total_cheat = total_cheat + 1
-                    # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
                 if standard_side_face_ratio.max() < side_face_ratio or standard_side_face_ratio.min() > side_face_ratio:
                     total_cheat = total_cheat + 1
-                    # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
                 if standard_eye_ratio.max() < white:
                     total_cheat = total_cheat + 1
-                    # cv2.putText(frame, "cheating", (50, 150), font, 3, (255, 0, 0))
 
         ret, frame = self.capture.read()
 
@@ -278,13 +249,11 @@ class MyApp(wx.App):
         # 웹캠 설정
         capFrame = wx.Frame(None)
         cap = ShowCapture(capFrame, capture)
-        # 전체화면
-        # ExploreWindow = win32gui.GetForegroundWindow()
-        # exploreClientRect = win32gui.GetClientRect(ExploreWindow)
-        # height = win32api.GetSystemMetrics(1)
-        # if exploreClientRect[3] < height:
-        #     smart_campus = win32gui.FindWindow("스마트캠퍼스", None)
 
+        # 웹사이트 열기
+        wb.open("myclass.ssu.ac.kr", 0, True)
+        time.sleep(0.8)
+        pyautogui.press('f11')
 
         # 키제한 - 작업관리자 창 따로 해줘야함
         keyboard.block_key('Tab')
@@ -307,24 +276,7 @@ class MyApp(wx.App):
         subkey = r"Software\Microsoft\Windows\CurrentVersion\Policies\System"
         registry = winreg.CreateKeyEx(key, subkey, 0, winreg.KEY_ALL_ACCESS)
         winreg.SetValueEx(registry, "DisableTaskmgr", 0, winreg.REG_DWORD, 1)
-
-        # 카카오톡 종료
-        for proc in psutil.process_iter():
-            try:
-                # 프로세스 이름, PID값 가져오기
-                processName = proc.name()
-                processID = proc.pid
-
-                if processName == 'KakaoTalk.exe':
-                    parent_pid = processID  # PID
-                    parent = psutil.Process(parent_pid)  # PID 찾기
-                    for child in parent.children(recursive=True):  # 자식-부모 종료
-                        child.kill()
-                    parent.kill()
-
-            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):  # 예외처리
-                pass
-
+        
         return True
 
     def actClipCursor(self, evt):
@@ -522,9 +474,8 @@ if __name__ == '__main__':
     total_cheat = 0
     total_blink = 0
 
-    wb.open("myclass.ssu.ac.kr", 0, True)
-    time.sleep(0.8)
-    pyautogui.press('f11')
+    # 지정 프로그램 종료
+    kp.turnOffProgram()
 
     app = MyApp(0)
     app.MainLoop()
