@@ -15,11 +15,6 @@ import time
 from math import hypot
 import webbrowser as wb
 
-from pywinauto.win32functions import GetCurrentThreadId
-from pywinauto.win32structures import HWND
-from win32process import GetWindowThreadProcessId, AttachThreadInput
-
-
 def get_blinking_ratio(eye_points, facial_landmarks):
     global frame
 
@@ -522,7 +517,10 @@ if __name__ == '__main__':
     total_cheat = 0
     total_blink = 0
 
-    wb.open("myclass.ssu.ac.kr", 0, True)
+    wb.register('Chrome', None, wb.BackgroundBrowser('C:\Program Files (''x86)\Google\Chrome\Application\chrome.exe'))
+    wb.get('Chrome').open_new("myclass.ssu.ac.kr")
+
+    # wb.open("myclass.ssu.ac.kr", 0, True)
     time.sleep(0.8)
     pyautogui.press('f11')
 
