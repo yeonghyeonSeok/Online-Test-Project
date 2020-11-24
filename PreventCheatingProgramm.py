@@ -11,7 +11,14 @@ import sys
 import winreg
 import numpy as np
 import dlib
+import time
 from math import hypot
+import webbrowser as wb
+
+from pywinauto.win32functions import GetCurrentThreadId
+from pywinauto.win32structures import HWND
+from win32process import GetWindowThreadProcessId, AttachThreadInput
+
 
 def get_blinking_ratio(eye_points, facial_landmarks):
     global frame
@@ -78,7 +85,6 @@ class MyFrame(wx.MiniFrame):
         self.btnEnd = wx.Button(panel, wx.ID_ANY, pos=(95, 70), label='종료')
         # 버튼 이벤트 추가
         self.Bind(wx.EVT_BUTTON, self.actEnd, self.btnEnd)
-
 
     def actEnd(self, evt):
         # 키해제
@@ -273,11 +279,12 @@ class MyApp(wx.App):
         capFrame = wx.Frame(None)
         cap = ShowCapture(capFrame, capture)
         # 전체화면
-        ExploreWindow = win32gui.GetForegroundWindow()
-        exploreClientRect = win32gui.GetClientRect(ExploreWindow)
-        height = win32api.GetSystemMetrics(1)
-        if exploreClientRect[3] < height:
-            pyautogui.press('f11')
+        # ExploreWindow = win32gui.GetForegroundWindow()
+        # exploreClientRect = win32gui.GetClientRect(ExploreWindow)
+        # height = win32api.GetSystemMetrics(1)
+        # if exploreClientRect[3] < height:
+        #     smart_campus = win32gui.FindWindow("스마트캠퍼스", None)
+
 
         # 키제한 - 작업관리자 창 따로 해줘야함
         keyboard.block_key('Tab')
@@ -335,6 +342,7 @@ class SettingFrame(wx.MiniFrame):
     global monitor
 
     def __init__(self, parent, id, title):
+
         wx.MiniFrame.__init__(self, parent, id, title, size=(400, 300), pos=wx.DefaultPosition, style=wx.CAPTION | wx.STAY_ON_TOP)
         self.readyPanel=wx.Panel(self)
 
@@ -511,9 +519,12 @@ if __name__ == '__main__':
 
     #전체 cheating, blinking 횟수
 
-
     total_cheat = 0
     total_blink = 0
+
+    wb.open("myclass.ssu.ac.kr", 0, True)
+    time.sleep(0.8)
+    pyautogui.press('f11')
 
     app = MyApp(0)
     app.MainLoop()
