@@ -476,6 +476,14 @@ if __name__ == '__main__':
     total_cheat = 0
     total_blink = 0
 
+    # 특정 웹브라우저 실행 후 
+    wb.register('Chrome', None, wb.BackgroundBrowser('C:\Program Files (''x86)\Google\Chrome\Application\chrome.exe'))
+    wb.get('Chrome').open_new("myclass.ssu.ac.kr")
+
+    # wb.open("myclass.ssu.ac.kr", 0, True)
+    time.sleep(0.8)
+    pyautogui.press('f11')
+    
     # 지정 프로그램 종료
     kp.turnOffProgram()
 
