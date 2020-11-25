@@ -250,8 +250,10 @@ class MyApp(wx.App):
         capFrame = wx.Frame(None)
         cap = ShowCapture(capFrame, capture)
 
-        # 웹사이트 열기
-        wb.open("myclass.ssu.ac.kr", 0, True)
+        # 특정 웹브라우저 실행
+        # 크롬 위치 지정
+        wb.register('Chrome', None, wb.BackgroundBrowser('C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'))
+        wb.get('Chrome').open_new("naver.com")
         time.sleep(0.8)
         pyautogui.press('f11')
 
